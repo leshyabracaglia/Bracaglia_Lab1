@@ -13,7 +13,6 @@ public class Linker {
 	public Linker(File input){
 		location = 0;
 		passOne(input); //calls first pass
-		passTwo(input); //calls second pass
 	}
 	
 	public void passOne(File input){ 
@@ -21,8 +20,7 @@ public class Linker {
 		try {
 	        Scanner sc = new Scanner(input);
 	        
-	        String modules = sc.next(); 
-	        int mods = Integer.parseInt(modules);
+	        int mods = sc.nextInt();
 	        this.relConstants = new int[mods];
 	        list = new Instruction[mods][];
 	        System.out.printf("%d modules\n", mods);
@@ -32,13 +30,14 @@ public class Linker {
 	        }
 	    } 
 	    catch (FileNotFoundException e) {
-	        e.printStackTrace();
 	    }
 		printList();
+		passTwo();
 		
 	}//end of passOne
 	
-	public void passOneModule(Scanner sc, int moduleNum){ //for reusability, implements pass one for one module only
+	//implements pass one for one module only
+	public void passOneModule(Scanner sc, int moduleNum){ 
 		
 		getVars(sc); //extracts variable definitions 
 		int uses = sc.nextInt();
@@ -63,9 +62,10 @@ public class Linker {
         	list[moduleNum][i] = in;
         }
         location+=change;
-	}
+	}//end of passone module
 	
-	public void printList(){
+	//a helper method to print the instruction list to check it
+	public void printList(){ 
 		for(int i=0; i<list.length; i++){
 			for(int j=0; j<list[i].length; j++){
 				System.out.printf("Key: %s, Num: %d\n", list[i][j].getType(), list[i][j].getAddress());
@@ -84,31 +84,15 @@ public class Linker {
         }
 	}//end of getVars
 	
-	public void passTwo(File input){
+	public void passTwo(){
 		System.out.println("\nPass Two: ");
-		try {
-			Scanner sc = new Scanner(input);
-	        String modules = sc.next(); //get number of modules
-	        int mods = Integer.parseInt(modules);
-	        System.out.printf("%d modules\n", mods);
-	        
-	        for(int i=0; i<mods; i++){
-	        	passTwoModule(sc, i);
-	        }
-	        int defs = sc.nextInt();
-	        for(int i=0; i<defs*2; i++){
-	        	System.out.printf("Skip %s\n", sc.next());
-	        }
-	        int uses = sc.nextInt();
-	        System.out.printf("%d uses\n", uses);
-	        
-	    } 
-	    catch (FileNotFoundException e) {
-	        e.printStackTrace();
-	    }
+        int mods = relConstants.length;
+        for(int i=0; i<mods; i++){
+        	passTwoModule(i);
+        }
 	}//end of passtwo
 	
-	public void passTwoModule(Scanner sc, int moduleNum){ //for reusability, implements pass two for one module only
+	public void passTwoModule(int moduleNum){ //for reusability, implements pass two for one module only
 		
 		int defs = sc.nextInt();
 		location=0;
@@ -132,7 +116,7 @@ public class Linker {
         	System.out.printf("letter: %s, num: %d\n", def,refnum);
         	switch(def){
         	case "R": reference(refnum, moduleNum); break;
-        	case "E": external(refnum,i, moduleNum, storage); break;
+        	case "E": external(i, moduleNum, storage); break;
         	case "I": immediate(refnum); break;
         	case "A": absolute(refnum); break;
         	}
@@ -146,26 +130,35 @@ public class Linker {
 		return newnum;
 	}
 	
-	public int external(int refnum, int locationInModule, int moduleNum, HashMap<Integer, String> uses){
-		int newnum = 0;
-		if(refnum%1000==777){ //end of reference
-			if(uses.containsKey(locationInModule)){ //if is a valid use
-				int value = vars.get(uses.get(locationInModule));
-				newnum=(refnum-(refnum%1000)+value);
-				System.out.printf("Returning %d\n", newnum);
-				return newnum;
-			}else{ //not a valid use
-				System.out.println("Error: this reference is not defined.");
-				newnum=(refnum-(refnum%1000)+111);
-				System.out.printf("Returning %d\n", newnum);
-				return newnum;
-			}
-		}else{ //linking to next guy
-			int link = refnum%1000;
-			int refnumber = list[moduleNum][link].getAddress();
-			return external(refnumber, moduleNum, link, uses);
+	public int external(int locationInModule, int moduleNum, HashMap<Integer, String> uses){
+		int newnum = 0; 
+		int refnum = list[moduleNum][locationInModule].getAddress();
+		if(refnum%1000==777 && uses.containsKey(locationInModule)){ //end of reference
+			int value = vars.get(uses.get(locationInModule));
+			newnum=(refnum-(refnum%1000)+value);
+			System.out.printf("Returning %d\n", newnum);
+			return newnum;
+		}else if(uses.containsKey(locationInModule)){ //a link
+			int change = vars.get(uses.get(locationInModule));
+			int link = (refnum-(refnum%1000));
+			link(link, moduleNum, change);
+			newnum=(link+change);
+			System.out.printf("Returning %d\n", newnum);
+			return newnum;
+		}else{ //error
+			newnum = (refnum-(refnum%1000)+111);
+			System.out.println("Error: inproper reference");
+			return newnum;
 		}
 		
+	}
+	
+	public int link(int destination, int moduleNum, int var){
+		int refnum = list[moduleNum][destination].getAddress();
+		int newnum;
+		if(refnum%1000==777){
+			newnum = (refnum-(refnum%1000)+var);
+		}
 	}
 
 	public int absolute(int refnum){
