@@ -16,8 +16,6 @@ public class Linker {
 		passTwo(input); //calls second pass
 	}
 	
-	//******************************************************************************
-	//The first pass collects and stores number of modules, definitions, relocations constants, 
 	public void passOne(File input){ 
 		System.out.println("\nPass One: ");
 		try {
@@ -67,8 +65,6 @@ public class Linker {
         location+=change;
 	}
 	
-	//**************************************************************
-	//Helper method to print the 2d list of instructions
 	public void printList(){
 		for(int i=0; i<list.length; i++){
 			for(int j=0; j<list[i].length; j++){
@@ -77,8 +73,6 @@ public class Linker {
 		}
 	}//end of printList
 	
-	//****************************************************************
-	//Collects variables definitions in a module, computes absolute address, stores in vars hashmap
 	public void getVars(Scanner sc){ //Collects variables, comput
 		int numvar = sc.nextInt();
         System.out.printf("%d variables\n", numvar);
@@ -137,8 +131,8 @@ public class Linker {
         	int refnum = sc.nextInt();
         	System.out.printf("letter: %s, num: %d\n", def,refnum);
         	switch(def){
-        	case "R": reference(refnum); break;
-        	case "E": external(refnum); break;
+        	case "R": reference(refnum, moduleNum); break;
+        	case "E": external(refnum,i, moduleNum, storage); break;
         	case "I": immediate(refnum); break;
         	case "A": absolute(refnum); break;
         	}
@@ -146,19 +140,32 @@ public class Linker {
         
 	}
 	
-	public int reference(int refnum){
-		int newnum = refnum+location;
+	public int reference(int refnum, int moduleNum){
+		int newnum = refnum+relConstants[moduleNum];
 		System.out.printf("Returning %d\n", newnum);
 		return newnum;
 	}
 	
-	public int external(int refnum){
+	public int external(int refnum, int locationInModule, int moduleNum, HashMap<Integer, String> uses){
 		int newnum = 0;
 		if(refnum%1000==777){ //end of reference
-			//search for definition
-			if(vars.containsKey(key))
+			if(uses.containsKey(locationInModule)){ //if is a valid use
+				int value = vars.get(uses.get(locationInModule));
+				newnum=(refnum-(refnum%1000)+value);
+				System.out.printf("Returning %d\n", newnum);
+				return newnum;
+			}else{ //not a valid use
+				System.out.println("Error: this reference is not defined.");
+				newnum=(refnum-(refnum%1000)+111);
+				System.out.printf("Returning %d\n", newnum);
+				return newnum;
+			}
+		}else{ //linking to next guy
+			int link = refnum%1000;
+			int refnumber = list[moduleNum][link].getAddress();
+			return external(refnumber, moduleNum, link, uses);
 		}
-		return newnum;
+		
 	}
 
 	public int absolute(int refnum){
@@ -167,7 +174,8 @@ public class Linker {
 	}
 
 	public int immediate(int refnum){
-		return 0;
+		System.out.printf("Returning %d\n", refnum);
+		return refnum;
 	}
 
 }///end of Linker class
